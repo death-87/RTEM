@@ -35,6 +35,24 @@ MAPA_COLORES_ESTATUS = {
     "RTEM PENDIENTE REVISION": "#f1c40f"   # Amarillo
 }
 
+class PDFCustom(FPDF):
+    def footer(self):
+        # Posición a 15 mm del final de la página
+        self.set_y(-18)
+        # Buscar el logo en cualquiera de las extensiones posibles
+        logo_path = None
+        for posible in ["logojn.png", "logojn.npg", "logo.png"]:
+            if os.path.exists(posible):
+                logo_path = posible
+                break
+        
+        if logo_path:
+            # x = 175 (esquina derecha, hoja A4 ancho 210mm menos 30mm de ancho de logo), y automática, ancho = 25mm
+            try:
+                self.image(logo_path, x=170, y=self.get_y(), w=25)
+            except Exception:
+                pass
+
 def normalizar_texto(texto):
     """Elimina tildes y pasa a minúsculas para comparaciones exactas"""
     if not isinstance(texto, str):
@@ -63,9 +81,9 @@ def extraer_coordenadas(coordenadas):
     return None, None
 
 def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_hex, titulo_rtem):
-    """Genera el PDF con celdas de altura dinámica en 2 columnas para que el texto baje correctamente"""
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=10)
+    """Genera el PDF usando la clase personalizada que incluye el logo abajo a la derecha"""
+    pdf = PDFCustom()
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     rgb = hex_to_rgb(color_hex)
     
@@ -107,7 +125,6 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     pdf.set_draw_color(*rgb)
     
     for i in range(0, len(items_filtrados), 2):
-        # Par de elementos (Izquierda y Derecha)
         k1, v1 = items_filtrados[i]
         k1_c = k1.encode('latin-1', 'replace').decode('latin-1')
         v1_c = v1.encode('latin-1', 'replace').decode('latin-1')
@@ -119,29 +136,22 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         else:
             k2_c, v2_c = "", ""
             
-        # Calcular dinámicamente cuántas líneas ocupa cada bloque de texto usando string length aproximado
-        # Cada 55 caracteres aprox equivale a una línea con fuente tamaño 8 en 93mm de ancho
         lineas_v1 = max(1, int(len(v1_c) / 52) + 1)
         lineas_v2 = max(1, int(len(v2_c) / 52) + 1) if k2_c else 1
         max_lineas = max(lineas_v1, lineas_v2)
         
-        # Altura total de la caja de valor para esta fila
         altura_valor = max_lineas * 4.5 + 2
         
-        # Verificar si hay espacio suficiente en la página actual antes de imprimir la fila
-        if pdf.get_y() + altura_valor + 10 > 280:
+        if pdf.get_y() + altura_valor + 15 > 270:
             pdf.add_page()
             
         x_inicio = pdf.get_x()
         y_inicio = pdf.get_y()
         
         # --- COLUMNA IZQUIERDA ---
-        # Título de Columna 1
         pdf.set_font("Arial", "B", 7.5)
         pdf.set_fill_color(245, 245, 245)
         pdf.cell(ancho_columna, 4.5, f"  {k1_c}", border="TRL", fill=True)
-        
-        # Espacio entre columnas
         pdf.cell(4, altura_valor + 4.5, "", border=0)
         
         # --- COLUMNA DERECHA ---
@@ -152,17 +162,13 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         else:
             pdf.cell(ancho_columna, 4.5, "", border=0, ln=True)
             
-        # Posicionar el cursor para imprimir los valores debajo de los títulos
         y_despues_titulos = pdf.get_y()
         
-        # Imprimir Valor Izquierdo con salto automático (multi_cell)
         pdf.set_xy(x_inicio, y_despues_titulos)
         pdf.set_font("Arial", "", 8)
         pdf.multi_cell(ancho_columna, 4.5, f"  {v1_c}", border="BRL")
-        
         y_fin_izq = pdf.get_y()
         
-        # Imprimir Valor Derecho si existe
         if k2_c:
             pdf.set_xy(x_inicio + ancho_columna + 4, y_despues_titulos)
             pdf.set_font("Arial", "", 8)
@@ -172,7 +178,6 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         else:
             max_y = y_fin_izq
             
-        # Mover el cursor a la siguiente posición unificada abajo de la fila más alta
         pdf.set_xy(x_inicio, max_y + 1)
         
     pdf.set_draw_color(0, 0, 0)
