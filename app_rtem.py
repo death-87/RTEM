@@ -1,4 +1,3 @@
-import os
 import re
 import unicodedata
 import urllib.parse
@@ -11,11 +10,10 @@ st.set_page_config(page_title="Control y Consulta RTEM", layout="wide")
 st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN EXACTA DEL EXCEL Y SHAREPOINT
+# CONFIGURACIÓN DE GOOGLE SHEETS Y SHAREPOINT
 # -----------------------------------------------------------------------------
-EXCEL_PATH = "Base_RTEM.xlsx"
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ/edit?gid=0#gid=0"
 NOMBRE_HOJA = "Reparaciones activas"
-FILA_TITULOS = 0  
 
 SHAREPOINT_DOMAIN = "https://ingemarsltdacl-my.sharepoint.com/my"
 RUTA_BASE_DOCUMENTOS = "/personal/juan_navarrete_enap_ingemars_cl/Documents/RTEM OT"
@@ -64,7 +62,7 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     
     rgb = hex_to_rgb(color_hex)
     
-    # 1. Título Principal con el área (ej. "RTEM AFR") y el color del estatus
+    # 1. Título Principal con el área y el color del estatus
     pdf.set_font("Arial", "B", 20)
     pdf.set_text_color(*rgb)
     pdf.cell(0, 10, titulo_rtem, ln=True, align="C")
@@ -112,16 +110,13 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         pdf.multi_cell(190, 6, f"  {v_clean}", border="BRL")
         pdf.ln(2)
         
-    pdf.set_draw_color(0, 0, 0) # Restaurar color por defecto
+    pdf.set_draw_color(0, 0, 0)
     return bytes(pdf.output())
 
-if not os.path.exists(EXCEL_PATH):
-    st.error(f"❌ No se encontró el archivo '{EXCEL_PATH}'.")
-    st.stop()
-
-# --- CARGA AUTOMÁTICA DE DATOS ---
+# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
 try:
-    df = pd.read_excel(EXCEL_PATH, sheet_name=NOMBRE_HOJA, header=FILA_TITULOS)
+    conn = st.connection("gsheets", type="gsheets")
+    df = conn.read(spreadsheet=GOOGLE_SHEET_URL, worksheet=NOMBRE_HOJA, ttl="10m")
     
     df.columns = [" ".join(str(c).split()) for c in df.columns]
     df = df.loc[:, ~df.columns.duplicated()]
@@ -134,7 +129,7 @@ try:
             df[col] = df[col].replace('nan', 'Sin información')
             
 except Exception as e:
-    st.error(f"❌ Error al procesar los datos: {e}")
+    st.error(f"❌ Error al conectar con Google Sheets: {e}")
     st.stop()
 
 # --- RECONOCIMIENTO DE COLUMNAS CLAVE ---
@@ -319,7 +314,7 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
             )
             st.write("") 
         
-        # Procesar coordenadas y URL de mapas para la app web (manteniéndose intacto en pantalla)
+        # Procesar coordenadas y URL de mapas para la app web
         lat, lon = None, None
         url_maps = ""
         if col_geo and registro[col_geo] != 'Sin información':
