@@ -15,18 +15,14 @@ st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ/edit?gid=0#gid=0"
 NOMBRE_HOJA = "Reparaciones activas"
 
-SHAREPOINT_DOMAIN = "https://ingemarsltdacl-my.sharepoint.com/my"
-RUTA_BASE_DOCUMENTOS = "/personal/juan_navarrete_enap_ingemars_cl/Documents/RTEM OT"
-VIEW_ID = "8538f9f4-f7e3-4934-ae58-d30321513a5d"
+# Enlace de tu carpeta "RTEM OT" en Google Drive
+GDRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1zGSlDQu5o9waFqm211P344MAqxCC8AAK"
 
-# Paleta de colores oficial para los estatus
-MAPA_COLORES_ESTATUS = {
-    "RTEM DEFINITIVA": "#28a745",          # Verde
-    "RTEM NO EJECUTADA": "#dc3545",        # Rojo
-    "RTEM EJECUTADA PARCIAL": "#d35400",   # Naranjo oscuro
-    "RTEM EJECUTADA": "#ff8c00",           # Naranjo
-    "RTEM PENDIENTE REVISION": "#f1c40f"   # Amarillo
-}
+def generar_link_gdrive(termino_busqueda):
+    """Genera un enlace de búsqueda directa dentro de tu carpeta de Google Drive"""
+    # Puedes abrir la carpeta general de Google Drive o filtrar por el término de búsqueda
+    busqueda_encoded = urllib.parse.quote(str(termino_busqueda))
+    return f"https://drive.google.com/drive/u/0/search?q={busqueda_encoded}"
 
 def normalizar_texto(texto):
     """Elimina tildes y pasa a minúsculas para comparaciones exactas"""
