@@ -115,10 +115,11 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
 
 # --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
 SHEET_ID = "1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Reparaciones activas"
+nombre_hoja_encoded = urllib.parse.quote(NOMBRE_HOJA)
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_encoded}"
 
 try:
-    # Leemos directamente con pandas sin necesidad de conexiones especiales
+    # Leemos directamente con pandas usando la URL codificada
     df = pd.read_csv(SHEET_URL)
     
     df.columns = [" ".join(str(c).split()) for c in df.columns]
