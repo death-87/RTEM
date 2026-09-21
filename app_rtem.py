@@ -63,49 +63,86 @@ def extraer_coordenadas(coordenadas):
     return None, None
 
 def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_hex, titulo_rtem):
-    """Genera el PDF real con el título personalizado y los bloques de datos sin enlaces externos"""
+    """Genera el PDF con la ficha organizada en 2 columnas para aprovechar el espacio"""
     pdf = FPDF()
     pdf.add_page()
     rgb = hex_to_rgb(color_hex)
     
-    pdf.set_font("Arial", "B", 20)
+    # 1. Título Principal con el área
+    pdf.set_font("Arial", "B", 18)
     pdf.set_text_color(*rgb)
-    pdf.cell(0, 10, titulo_rtem, ln=True, align="C")
+    pdf.cell(0, 8, titulo_rtem, ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
-    pdf.ln(2)
+    pdf.ln(1)
     
-    pdf.set_font("Arial", "B", 12)
-    txt_orden_aviso = f"ORDEN: {val_orden}   |   AVISO: {val_aviso}"
-    pdf.cell(0, 8, txt_orden_aviso, ln=True, align="C")
-    pdf.ln(3)
-    
+    # 2. Orden y Aviso destacados
     pdf.set_font("Arial", "B", 11)
-    pdf.set_text_color(*rgb)
-    pdf.cell(0, 7, f"Estatus Actual: {valor_status}", ln=True)
-    pdf.set_text_color(0, 0, 0)
-    
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "Detalle Tecnico de la Reparacion", ln=True)
+    txt_orden_aviso = f"ORDEN: {val_orden}   |   AVISO: {val_aviso}"
+    pdf.cell(0, 6, txt_orden_aviso, ln=True, align="C")
     pdf.ln(2)
     
+    # Estatus Actual
+    pdf.set_font("Arial", "B", 10)
+    pdf.set_text_color(*rgb)
+    pdf.cell(0, 6, f"Estatus Actual: {valor_status}", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    
+    pdf.ln(3)
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(0, 6, "Detalle Tecnico de la Reparacion", ln=True)
+    pdf.ln(1)
+    
+    # Filtrar datos excluidos
+    items_filtrados = []
     for k, v in datos_mostrar.items():
         k_str = str(k)
         k_norm = normalizar_texto(k_str)
         palabras_excluidas = ["unnamed", "indicador abc", "estatus", "status", "cantidad", "perfil catalogo", "perfil"]
         if any(p in k_norm for p in palabras_excluidas):
             continue
-            
-        k_clean = k_str.encode('latin-1', 'replace').decode('latin-1')
-        v_clean = str(v).encode('latin-1', 'replace').decode('latin-1')
+        items_filtrados.append((k_str, str(v)))
+    
+    # Imprimir en 2 columnas (pares de elementos)
+    ancho_columna = 93  # Ancho para cada una de las 2 columnas (Total aprox 186 mm)
+    alto_celda = 5
+    
+    pdf.set_draw_color(*rgb)
+    
+    for i in range(0, len(items_filtrados), 2):
+        # Primer elemento del par (Columna Izquierda)
+        k1, v1 = items_filtrados[i]
+        k1_c = k1.encode('latin-1', 'replace').decode('latin-1')
+        v1_c = v1.encode('latin-1', 'replace').decode('latin-1')
         
-        pdf.set_draw_color(*rgb)
-        pdf.set_font("Arial", "B", 9)
+        # Segundo elemento del par (Columna Derecha), si existe
+        if i + 1 < len(items_filtrados):
+            k2, v2 = items_filtrados[i+1]
+            k2_c = k2.encode('latin-1', 'replace').decode('latin-1')
+            v2_c = v2.encode('latin-1', 'replace').decode('latin-1')
+        else:
+            k2_c, v2_c = "", ""
+            
+        # Dibujar Títulos (Cabeceras de celdas)
+        pdf.set_font("Arial", "B", 8)
         pdf.set_fill_color(245, 245, 245)
-        pdf.cell(190, 6, f"  {k_clean}", border="TRL", ln=True, fill=True)
-        pdf.set_font("Arial", "", 9)
-        pdf.multi_cell(190, 6, f"  {v_clean}", border="BRL")
-        pdf.ln(2)
+        
+        pdf.cell(ancho_columna, 5, f"  {k1_c}", border="TRL", fill=True)
+        pdf.cell(4, 5, "", border=0) # Espacio separador entre columnas
+        if k2_c:
+            pdf.cell(ancho_columna, 5, f"  {k2_c}", border="TRL", fill=True, ln=True)
+        else:
+            pdf.cell(ancho_columna, 5, "", border=0, ln=True)
+            
+        # Dibujar Valores
+        pdf.set_font("Arial", "", 8)
+        pdf.cell(ancho_columna, 6, f"  {v1_c}", border="BRL")
+        pdf.cell(4, 6, "", border=0)
+        if k2_c:
+            pdf.cell(ancho_columna, 6, f"  {v2_c}", border="BRL", ln=True)
+        else:
+            pdf.cell(ancho_columna, 6, "", border=0, ln=True)
+            
+        pdf.ln(1)
         
     pdf.set_draw_color(0, 0, 0)
     return bytes(pdf.output())
