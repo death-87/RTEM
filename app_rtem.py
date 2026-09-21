@@ -114,9 +114,12 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     return bytes(pdf.output())
 
 # --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
+SHEET_ID = "1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Reparaciones activas"
+
 try:
-    conn = st.connection("gsheets", type="gsheets")
-    df = conn.read(spreadsheet=GOOGLE_SHEET_URL, worksheet=NOMBRE_HOJA, ttl="10m")
+    # Leemos directamente con pandas sin necesidad de conexiones especiales
+    df = pd.read_csv(SHEET_URL)
     
     df.columns = [" ".join(str(c).split()) for c in df.columns]
     df = df.loc[:, ~df.columns.duplicated()]
