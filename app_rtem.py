@@ -1,3 +1,4 @@
+import os
 import re
 import unicodedata
 import urllib.parse
@@ -10,19 +11,21 @@ st.set_page_config(page_title="Control y Consulta RTEM", layout="wide")
 st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE GOOGLE SHEETS Y SHAREPOINT
+# CONFIGURACIÓN DE GOOGLE SHEETS Y GOOGLE DRIVE
 # -----------------------------------------------------------------------------
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ/edit?gid=0#gid=0"
+SHEET_ID = "1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ"
 NOMBRE_HOJA = "Reparaciones activas"
 
-# Enlace de tu carpeta "RTEM OT" en Google Drive
 GDRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1zGSlDQu5o9waFqm211P344MAqxCC8AAK"
 
-def generar_link_gdrive(termino_busqueda):
-    """Genera un enlace de búsqueda directa dentro de tu carpeta de Google Drive"""
-    # Puedes abrir la carpeta general de Google Drive o filtrar por el término de búsqueda
-    busqueda_encoded = urllib.parse.quote(str(termino_busqueda))
-    return f"https://drive.google.com/drive/u/0/search?q={busqueda_encoded}"
+# Paleta de colores oficial para los estatus
+MAPA_COLORES_ESTATUS = {
+    "RTEM DEFINITIVA": "#28a745",          # Verde
+    "RTEM NO EJECUTADA": "#dc3545",        # Rojo
+    "RTEM EJECUTADA PARCIAL": "#d35400",   # Naranjo oscuro
+    "RTEM EJECUTADA": "#ff8c00",           # Naranjo
+    "RTEM PENDIENTE REVISION": "#f1c40f"   # Amarillo
+}
 
 def normalizar_texto(texto):
     """Elimina tildes y pasa a minúsculas para comparaciones exactas"""
@@ -36,10 +39,10 @@ def hex_to_rgb(hex_code):
     hex_code = hex_code.lstrip('#')
     return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
 
-def generar_link_sharepoint(termino_busqueda):
-    id_encoded = urllib.parse.quote(RUTA_BASE_DOCUMENTOS, safe="")
+def generar_link_gdrive(termino_busqueda):
+    """Genera un enlace de búsqueda directa dentro de la carpeta de Google Drive"""
     busqueda_encoded = urllib.parse.quote(str(termino_busqueda))
-    return f"{SHAREPOINT_DOMAIN}?id={id_encoded}&viewid={VIEW_ID}&q={busqueda_encoded}"
+    return f"https://drive.google.com/drive/u/0/search?q={busqueda_encoded}"
 
 def extraer_coordenadas(coordenadas):
     if pd.isna(coordenadas) or str(coordenadas).strip() in ['Sin información', 'nan']:
@@ -58,7 +61,7 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     
     rgb = hex_to_rgb(color_hex)
     
-    # 1. Título Principal con el área y el color del estatus
+    # 1. Título Principal con el área (ej. "RTEM AFR") y el color del estatus
     pdf.set_font("Arial", "B", 20)
     pdf.set_text_color(*rgb)
     pdf.cell(0, 10, titulo_rtem, ln=True, align="C")
@@ -106,16 +109,14 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         pdf.multi_cell(190, 6, f"  {v_clean}", border="BRL")
         pdf.ln(2)
         
-    pdf.set_draw_color(0, 0, 0)
+    pdf.set_draw_color(0, 0, 0) # Restaurar color por defecto
     return bytes(pdf.output())
 
-# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
-SHEET_ID = "1PjTQCns0CYSzo2l1U9GXnSPS7qBAcVts-G0BwRxjSlQ"
+# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS (VÍA CSV SEGURO) ---
 nombre_hoja_encoded = urllib.parse.quote(NOMBRE_HOJA)
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_encoded}"
 
 try:
-    # Leemos directamente con pandas usando la URL codificada
     df = pd.read_csv(SHEET_URL)
     
     df.columns = [" ".join(str(c).split()) for c in df.columns]
@@ -306,10 +307,10 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
             termino_busqueda = registro[col_aviso]
             
         if termino_busqueda:
-            url_sharepoint = generar_link_sharepoint(termino_busqueda)
+            url_gdrive = generar_link_gdrive(termino_busqueda)
             st.link_button(
-                label=f"📂 Abrir Carpeta OT '{termino_busqueda}' en SharePoint", 
-                url=url_sharepoint, 
+                label=f"📂 Buscar OT '{termino_busqueda}' en Google Drive", 
+                url=url_gdrive, 
                 use_container_width=True
             )
             st.write("") 
