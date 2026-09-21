@@ -8,7 +8,26 @@ import plotly.express as px
 from fpdf import FPDF
 
 st.set_page_config(page_title="Control y Consulta RTEM", layout="wide")
-st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
+
+# -----------------------------------------------------------------------------
+# CABECERA CON LOGO Y TÍTULO PERSONALIZADO
+# -----------------------------------------------------------------------------
+col_logo, col_titulo = st.columns([1, 6])
+
+with col_logo:
+    if os.path.exists("logojn.npg"):
+        st.image("logojn.npg", width=110)
+    else:
+        st.write("") # Espacio si no cargó
+
+with col_titulo:
+    st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
+
+# Franja de lado a lado en la parte superior
+if os.path.exists("franja.jpg"):
+    st.image("franja.jpg", use_container_width=True)
+
+st.markdown("---")
 
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN DE GOOGLE SHEETS Y GOOGLE DRIVE
@@ -28,19 +47,16 @@ MAPA_COLORES_ESTATUS = {
 }
 
 def normalizar_texto(texto):
-    """Elimina tildes y pasa a minúsculas para comparaciones exactas"""
     if not isinstance(texto, str):
         texto = str(texto)
     nfkd_form = unicodedata.normalize('NFKD', texto)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower().strip()
 
 def hex_to_rgb(hex_code):
-    """Convierte un color HEX a una tupla RGB para FPDF"""
     hex_code = hex_code.lstrip('#')
     return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
 
 def generar_link_gdrive(termino_busqueda):
-    """Genera un enlace de búsqueda directa dentro de la carpeta de Google Drive"""
     busqueda_encoded = urllib.parse.quote(str(termino_busqueda))
     return f"https://drive.google.com/drive/u/0/search?q={busqueda_encoded}"
 
@@ -55,26 +71,21 @@ def extraer_coordenadas(coordenadas):
     return None, None
 
 def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_hex, titulo_rtem):
-    """Genera el PDF real con el título personalizado y los bloques de datos sin enlaces externos"""
     pdf = FPDF()
     pdf.add_page()
-    
     rgb = hex_to_rgb(color_hex)
     
-    # 1. Título Principal con el área (ej. "RTEM AFR") y el color del estatus
     pdf.set_font("Arial", "B", 20)
     pdf.set_text_color(*rgb)
     pdf.cell(0, 10, titulo_rtem, ln=True, align="C")
     pdf.set_text_color(0, 0, 0)
     pdf.ln(2)
     
-    # 2. Orden y Aviso destacados abajo del título
     pdf.set_font("Arial", "B", 12)
     txt_orden_aviso = f"ORDEN: {val_orden}   |   AVISO: {val_aviso}"
     pdf.cell(0, 8, txt_orden_aviso, ln=True, align="C")
     pdf.ln(3)
     
-    # Estatus Actual con su color respectivo
     pdf.set_font("Arial", "B", 11)
     pdf.set_text_color(*rgb)
     pdf.cell(0, 7, f"Estatus Actual: {valor_status}", ln=True)
@@ -85,11 +96,9 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     pdf.cell(0, 8, "Detalle Tecnico de la Reparacion", ln=True)
     pdf.ln(2)
     
-    # Recorremos los datos aplicando el color del estatus en los bordes de los recuadros
     for k, v in datos_mostrar.items():
         k_str = str(k)
         k_norm = normalizar_texto(k_str)
-        
         palabras_excluidas = ["unnamed", "indicador abc", "estatus", "status", "cantidad", "perfil catalogo", "perfil"]
         if any(p in k_norm for p in palabras_excluidas):
             continue
@@ -98,27 +107,22 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
         v_clean = str(v).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.set_draw_color(*rgb)
-        
-        # Etiqueta del campo
         pdf.set_font("Arial", "B", 9)
         pdf.set_fill_color(245, 245, 245)
         pdf.cell(190, 6, f"  {k_clean}", border="TRL", ln=True, fill=True)
-        
-        # Valor con ajuste automático multilínea
         pdf.set_font("Arial", "", 9)
         pdf.multi_cell(190, 6, f"  {v_clean}", border="BRL")
         pdf.ln(2)
         
-    pdf.set_draw_color(0, 0, 0) # Restaurar color por defecto
+    pdf.set_draw_color(0, 0, 0)
     return bytes(pdf.output())
 
-# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS (VÍA CSV SEGURO) ---
+# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
 nombre_hoja_encoded = urllib.parse.quote(NOMBRE_HOJA)
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_encoded}"
 
 try:
     df = pd.read_csv(SHEET_URL)
-    
     df.columns = [" ".join(str(c).split()) for c in df.columns]
     df = df.loc[:, ~df.columns.duplicated()]
     df = df.fillna("Sin información")
@@ -188,12 +192,10 @@ if col_emplazamiento:
 # --- VISTA PRINCIPAL ---
 st.markdown(f"**Registros encontrados:** `{len(df_filtrado)}` de `{len(df)}` totales.")
 
-# Pestañas Principales en la UI
 pestana_tabla, pestana_stats = st.tabs(["📊 Vista General de Datos", "📈 Panel de Estadísticas y Gráficos"])
 
 with pestana_tabla:
     st.caption("💡 Haz clic en cualquier fila de la tabla para abrir inmediatamente su Ficha Técnica detallada.")
-
     palabras_a_ocultar = ['emplazamiento', 'equipo', 'indicador abc', 'prioridad', 'fecha de entrada', 'ubicac.tecnica', 'ubicac tecnica', 'fe.fin extrema']
     
     columnas_visibles = []
@@ -226,21 +228,12 @@ with pestana_stats:
         st.warning("No hay datos para mostrar en las estadísticas con los filtros actuales.")
     else:
         col_g1, col_g2 = st.columns(2)
-        
         with col_g1:
             st.markdown("##### 📉 Reparaciones por Estatus")
             if col_status:
                 df_status_counts = df_filtrado[col_status].value_counts().reset_index()
                 df_status_counts.columns = ['Estatus', 'Cantidad']
-                
-                fig_status = px.bar(
-                    df_status_counts, 
-                    x='Estatus', 
-                    y='Cantidad',
-                    color='Estatus',
-                    color_discrete_map=MAPA_COLORES_ESTATUS,
-                    text='Cantidad'
-                )
+                fig_status = px.bar(df_status_counts, x='Estatus', y='Cantidad', color='Estatus', color_discrete_map=MAPA_COLORES_ESTATUS, text='Cantidad')
                 fig_status.update_layout(showlegend=False, xaxis_title="", yaxis_title="Total")
                 st.plotly_chart(fig_status, use_container_width=True)
             else:
@@ -251,19 +244,12 @@ with pestana_stats:
             if col_area:
                 df_area_counts = df_filtrado[col_area].value_counts().reset_index()
                 df_area_counts.columns = ['Área', 'Cantidad']
-                
-                fig_area = px.bar(
-                    df_area_counts,
-                    x='Área',
-                    y='Cantidad',
-                    text='Cantidad'
-                )
+                fig_area = px.bar(df_area_counts, x='Área', y='Cantidad', text='Cantidad')
                 fig_area.update_layout(showlegend=False, xaxis_title="", yaxis_title="Total")
                 st.plotly_chart(fig_area, use_container_width=True)
             else:
                 st.info("No se encontró la columna de Área para graficar.")
 
-# Si hay un registro seleccionado o el filtro deja exactamente 1 fila
 if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
     registro = registro_seleccionado if registro_seleccionado is not None else df_filtrado.iloc[0]
     
@@ -275,13 +261,11 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
     with col_detalles:
         titulo_ficha = f"Orden: {registro[col_orden]}" if col_orden and registro[col_orden] != 'Sin información' else "Detalle del Registro"
         st.subheader(f"📋 Ficha Técnica - {titulo_ficha}")
-        
         datos_mostrar = {k: v for k, v in registro.items() if "Unnamed" not in str(k) and k != col_status}
         df_ficha = pd.DataFrame(list(datos_mostrar.items()), columns=['Campo', 'Valor'])
         st.table(df_ficha)
 
     with col_enlaces:
-        # BLOQUE DE ESTATUS CON COLORES SINCRONIZADOS
         color_principal = "#005ce6"
         valor_status = "SIN INFORMACIÓN"
         if col_status and registro[col_status] != 'Sin información':
@@ -315,7 +299,6 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
             )
             st.write("") 
         
-        # Procesar coordenadas y URL de mapas para la app web
         lat, lon = None, None
         url_maps = ""
         if col_geo and registro[col_geo] != 'Sin información':
@@ -323,13 +306,11 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
             if lat and lon:
                 url_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
-        # Obtener el valor del área para el título del PDF (ej. "RTEM AFR")
         nombre_area = ""
         if col_area and registro[col_area] != 'Sin información':
             nombre_area = str(registro[col_area]).strip()
         titulo_rtem = f"RTEM {nombre_area}" if nombre_area else "RTEM"
 
-        # --- BOTÓN DE DESCARGA DIRECTA DE PDF ---
         pdf_bytes = generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_principal, titulo_rtem)
         st.download_button(
             label="📄 Descargar Ficha en PDF para Terreno",
@@ -340,7 +321,7 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
         )
         st.write("")
 
-        st.markdown("🖼️ **Vista previa de Inspección (Ej: 'app')**")
+        st.markdown("🖼️ **Vista previa de Inspección**")
         foto_subida = st.file_uploader("Sube o arrastra la imagen de esta orden:", type=["png", "jpg", "jpeg"], key="visor_foto")
         
         if foto_subida is not None:
@@ -348,14 +329,12 @@ if (registro_seleccionado is not None) or (len(df_filtrado) == 1):
 
         st.markdown("---")
 
-        # MAPA DE GOOGLE MAPS EN LA APLICACIÓN CON ZOOM EQUILIBRADO (z=16)
         if lat and lon:
             st.link_button(
                 label="🗺️ Abrir en Google Maps (Pantalla completa)", 
                 url=url_maps, 
                 use_container_width=True
             )
-            
             mapa_html = f"""
             <iframe 
                 width="100%" 
