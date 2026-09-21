@@ -10,23 +10,12 @@ from fpdf import FPDF
 st.set_page_config(page_title="Control y Consulta RTEM", layout="wide")
 
 # -----------------------------------------------------------------------------
-# CABECERA CON LOGO Y TÍTULO PERSONALIZADO
+# CABECERA VISUAL: FRANJA Y TÍTULO
 # -----------------------------------------------------------------------------
-col_logo, col_titulo = st.columns([1, 6])
-
-with col_logo:
-    if os.path.exists("logojn.npg"):
-        st.image("logojn.npg", width=110)
-    else:
-        st.write("") # Espacio si no cargó
-
-with col_titulo:
-    st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
-
-# Franja de lado a lado en la parte superior
 if os.path.exists("franja.jpg"):
     st.image("franja.jpg", use_container_width=True)
 
+st.title("🔎 Sistema de Consulta e Inspecciones RTEM")
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
@@ -47,16 +36,19 @@ MAPA_COLORES_ESTATUS = {
 }
 
 def normalizar_texto(texto):
+    """Elimina tildes y pasa a minúsculas para comparaciones exactas"""
     if not isinstance(texto, str):
         texto = str(texto)
     nfkd_form = unicodedata.normalize('NFKD', texto)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower().strip()
 
 def hex_to_rgb(hex_code):
+    """Convierte un color HEX a una tupla RGB para FPDF"""
     hex_code = hex_code.lstrip('#')
     return tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
 
 def generar_link_gdrive(termino_busqueda):
+    """Genera un enlace de búsqueda directa dentro de la carpeta de Google Drive"""
     busqueda_encoded = urllib.parse.quote(str(termino_busqueda))
     return f"https://drive.google.com/drive/u/0/search?q={busqueda_encoded}"
 
@@ -71,6 +63,7 @@ def extraer_coordenadas(coordenadas):
     return None, None
 
 def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_hex, titulo_rtem):
+    """Genera el PDF real con el título personalizado y los bloques de datos sin enlaces externos"""
     pdf = FPDF()
     pdf.add_page()
     rgb = hex_to_rgb(color_hex)
@@ -117,7 +110,7 @@ def generar_pdf_orden(val_orden, val_aviso, valor_status, datos_mostrar, color_h
     pdf.set_draw_color(0, 0, 0)
     return bytes(pdf.output())
 
-# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS ---
+# --- CARGA AUTOMÁTICA DESDE GOOGLE SHEETS (VÍA CSV SEGURO) ---
 nombre_hoja_encoded = urllib.parse.quote(NOMBRE_HOJA)
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_hoja_encoded}"
 
@@ -187,6 +180,15 @@ if col_emplazamiento:
     emp_sel = st.sidebar.selectbox("Filtrar por Emplazamiento:", emplazamientos)
     if emp_sel != "Todos":
         df_filtrado = df_filtrado[df_filtrado[col_emplazamiento] == emp_sel]
+
+# --- LOGO INSTITUCIONAL AL PIE DE LA BARRA LATERAL ---
+st.sidebar.markdown("---")
+if os.path.exists("logojn.png"):
+    st.sidebar.image("logojn.png", use_container_width=True)
+elif os.path.exists("logojn.npg"):
+    st.sidebar.image("logojn.npg", use_container_width=True)
+elif os.path.exists("logo.png"):
+    st.sidebar.image("logo.png", use_container_width=True)
 
 
 # --- VISTA PRINCIPAL ---
