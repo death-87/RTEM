@@ -205,11 +205,13 @@ def main():
         else:
             nombre = re.sub(r"[^\w-]+", "_", str(orden))[:80]
             if contenido is not None:
-                st.download_button("📄 Descargar ficha PDF", contenido, file_name=f"Ficha_OT_{nombre}.pdf", mime="application/pdf", use_container_width=True)
+                st.caption(f'Contenido del PDF: mapa {"incluido (puede aparecer en la página siguiente)" if mapa else "no adjuntado"}.')
+                version_pdf = sha256(contenido).hexdigest()[:12]
+                st.download_button("📄 Descargar ficha PDF", contenido, file_name=f"Ficha_OT_{nombre}_{version_pdf}.pdf", mime="application/pdf", key=f'pdf_{identidad}_{version_pdf}', use_container_width=True)
             else:
-                st.info('Reemplaza o elimina la captura inválida para descargar la ficha.')
+                st.info('Reemplaza o elimina la imagen inválida para descargar la ficha.')
         foto = st.file_uploader("Vista previa de evidencia", type=["png", "jpg", "jpeg"], key=f"foto_{identidad}")
-        st.caption("La imagen es temporal: no se guarda en Drive ni se incluye en el PDF.")
+        st.caption("La imagen de evidencia es temporal: no se guarda en Drive ni se incluye en el PDF. Para incorporar el mapa usa el campo Subir captura del mapa.")
         if foto:
             st.image(foto, caption=f"Evidencia · {termino}", use_container_width=True)
         ubicacion = None
