@@ -7,7 +7,8 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image as PDFImage
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 AZUL = '#142D4E'
 TURQUESA = '#087F8C'
@@ -105,7 +106,28 @@ def panel(st, px, pd, vista, claves, colores):
         st.download_button('Descargar resumen CSV', resumen.to_csv(index=False).encode('utf-8-sig'), 'resumen_rtem.csv', 'text/csv')
 
 
-def generar_pdf(registro, claves, actualizado, colores, normalizar, base):
+def preparar_mapa(contenido):
+    """Valida y normaliza la captura en memoria, manteniendo la imagen completa."""
+    if len(contenido) > 10 * 1024 * 1024:
+        raise ValueError('La captura debe pesar como máximo 10 MB.')
+    try:
+        with Image.open(BytesIO(contenido)) as original:
+            if original.format not in {'PNG', 'JPEG'}:
+                raise ValueError('Sube una imagen PNG o JPG.')
+            if original.width * original.height > 20_000_000:
+                raise ValueError('La captura debe tener como máximo 20 megapíxeles.')
+            imagen = ImageOps.exif_transpose(original).convert('RGBA')
+            fondo = Image.new('RGB', imagen.size, 'white')
+            fondo.paste(imagen, mask=imagen.getchannel('A'))
+            fondo.thumbnail((2400, 2400))
+            salida = BytesIO()
+            fondo.save(salida, format='PNG')
+            return salida.getvalue()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+        raise ValueError('No se pudo leer la captura. Prueba con otro archivo PNG o JPG.') from exc
+
+
+def generar_pdf(registro, claves, actualizado, colores, normalizar, base, mapa=None):
     """Ficha imprimible A4, con cabecera repetida y detalle que puede continuar en otra página."""
     salida = BytesIO()
     orden = str(registro.get(claves['orden'], 'Sin información'))
@@ -135,7 +157,19 @@ def generar_pdf(registro, claves, actualizado, colores, normalizar, base):
         if campo in excluidos:
             continue
         story += [p(campo, 'etiqueta'), p(valor), Spacer(1, 5)]
-    story += [p('02 / Registro de inspección en terreno', 'seccion'), p('Completar manualmente durante la inspección. Estos campos no constituyen una aprobación.')]
+    if mapa is not None:
+        captura = PDFImage(BytesIO(preparar_mapa(mapa)))
+        escala = min(doc.width / captura.imageWidth, 270 / captura.imageHeight)
+        captura.drawWidth = captura.imageWidth * escala
+        captura.drawHeight = captura.imageHeight * escala
+        captura.hAlign = 'CENTER'
+        story += [KeepTogether([
+            p('02 / Ubicación de la reparación', 'seccion'),
+            captura, Spacer(1, 8),
+            p('Captura de mapa adjuntada manualmente para esta reparación. Referencia visual proporcionada por el usuario.')
+        ])]
+    numero = '03' if mapa is not None else '02'
+    story += [p(f'{numero} / Registro de inspección en terreno', 'seccion'), p('Completar manualmente durante la inspección. Estos campos no constituyen una aprobación.')]
     casillas = Table([[p('Fecha: __________________'), p('Inspector/a: __________________________')],
                       [p('Observaciones:'), ''], ['', ''], ['', ''],
                       [p('Firma: __________________'), p('Referencia de evidencia: _________________')]], colWidths=[255,256], rowHeights=[32,24,26,26,36])
