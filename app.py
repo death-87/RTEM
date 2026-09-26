@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from fpdf import FPDF
+from diseno import aplicar_diseno, panel, generar_pdf as pdf_profesional
 
 BASE = Path(__file__).resolve().parent
 VACIO = "Sin información"
@@ -84,54 +84,8 @@ def recurso(*nombres):
     return next((BASE / n for n in nombres if (BASE / n).is_file()), None)
 
 
-def texto_pdf(valor):
-    # Helvetica admite español en Latin-1. Otros caracteres se sustituyen.
-    return str(valor).encode("latin-1", "replace").decode("latin-1")
-
-
-class FichaPDF(FPDF):
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("Helvetica", "", 8)
-        self.set_text_color(100, 100, 100)
-        self.cell(0, 6, f"RTEM | Página {self.page_no()}", align="C")
-        logo = recurso("logojn.png", "logo.png", "logojn.npg")
-        if logo:
-            try:
-                self.image(str(logo), x=175, y=self.h - 18, w=20, h=12, keep_aspect_ratio=True)
-            except (OSError, ValueError):
-                LOG.warning("No se pudo incorporar el logo al PDF", exc_info=True)
-
-
 def generar_pdf(registro, claves, actualizado):
-    pdf = FichaPDF()
-    pdf.set_auto_page_break(True, margin=23)
-    pdf.add_page()
-    estado = registro.get(claves["estado"], VACIO)
-    color = COLORES.get(normalizar(estado).upper(), "#005ce6")
-    rgb = tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
-
-    def escribir(texto, tam=10, negrita=False):
-        pdf.set_font("Helvetica", "B" if negrita else "", tam)
-        pdf.multi_cell(0, 6, texto_pdf(texto), new_x="LMARGIN", new_y="NEXT")
-
-    pdf.set_text_color(*rgb)
-    escribir(f"RTEM · {registro.get(claves['area'], VACIO)}", 16, True)
-    escribir(f"Estatus: {estado}", 11, True)
-    pdf.set_text_color(0, 0, 0)
-    escribir(f"Orden: {registro.get(claves['orden'], VACIO)} | Aviso: {registro.get(claves['aviso'], VACIO)}", 11, True)
-    escribir(f"Datos consultados: {actualizado}", 8)
-    pdf.ln(4)
-    # Una columna permite que valores extensos continúen en páginas siguientes.
-    for campo, valor in registro.items():
-        if campo == claves["estado"]:
-            continue
-        if pdf.get_y() + 18 > pdf.h - pdf.b_margin:
-            pdf.add_page()
-        escribir(campo, 9, True)
-        escribir(valor)
-        pdf.ln(2)
-    return bytes(pdf.output())
+    return pdf_profesional(registro, claves, actualizado, COLORES, normalizar, BASE)
 
 
 def main():
@@ -139,8 +93,7 @@ def main():
     franja = recurso("franja.jpg")
     if franja:
         st.image(str(franja), use_container_width=True)
-    st.title("🔎 Consulta e inspecciones RTEM")
-    st.caption("Consulta reparaciones, revisa evidencias y descarga fichas para terreno.")
+    aplicar_diseno(st)
     if st.sidebar.button("Actualizar datos", use_container_width=True):
         cargar.clear()
     try:
@@ -196,7 +149,7 @@ def main():
     if vista.empty:
         st.info("No hay resultados. Modifica o limpia los filtros.")
         return
-    tabla, estadisticas = st.tabs(["📋 Reparaciones", "📊 Estadísticas"])
+    estadisticas, tabla = st.tabs(["📊 Panorama operativo", "📋 Consulta de reparaciones"])
     registro = None
     with tabla:
         st.caption("Selecciona una fila para abrir su ficha técnica.")
@@ -210,17 +163,7 @@ def main():
         elif len(vista) == 1:
             registro = vista.iloc[0]
     with estadisticas:
-        st.caption("Los gráficos utilizan los filtros actuales y los datos de la última consulta.")
-        for contenedor, nombre, titulo in zip(st.columns(2), ("estado", "area"), ("Reparaciones por estatus", "Distribución por área")):
-            with contenedor:
-                campo = claves[nombre]
-                if campo:
-                    resumen = vista[campo].value_counts().rename_axis("Categoría").reset_index(name="Cantidad")
-                    fig = px.bar(resumen, x="Cantidad", y="Categoría", orientation="h", color="Categoría", text="Cantidad", title=titulo, color_discrete_map=COLORES)
-                    fig.update_layout(showlegend=False, yaxis_title="", height=max(350, len(resumen) * 32))
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info(f"Falta la columna: {nombre}.")
+        panel(st, px, pd, vista, claves, COLORES)
     if registro is None:
         return
     st.divider()
