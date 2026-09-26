@@ -166,10 +166,10 @@ def generar_pdf(registro, claves, actualizado, colores, normalizar, base, mapa=N
         story += [KeepTogether([
             p('02 / Ubicación de la reparación', 'seccion'),
             captura, Spacer(1, 8),
-            p('Captura de mapa adjuntada manualmente para esta reparación. Referencia visual proporcionada por el usuario.')
+            p('Captura de mapa adjuntada manualmente para esta reparación.')
         ])]
-    numero = '03' if mapa is not None else '02'
-    story += [p(f'{numero} / Registro de inspección en terreno', 'seccion'), p('Completar manualmente durante la inspección. Estos campos no constituyen una aprobación.')]
+    numero = 3 if mapa is not None else 2
+    story += [p(f'{numero:02d} / Registro de inspección en terreno', 'seccion'), p('Completar manualmente durante la inspección. Estos campos no constituyen una aprobación.')]
     casillas = Table([[p('Fecha: __________________'), p('Inspector/a: __________________________')],
                       [p('Observaciones:'), ''], ['', ''], ['', ''],
                       [p('Firma: __________________'), p('Referencia de evidencia: _________________')]], colWidths=[255,256], rowHeights=[32,24,26,26,36])
