@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from diseno import aplicar_diseno, panel, generar_pdf as pdf_profesional
+from diseno import aplicar_diseno, panel, preparar_mapa, generar_pdf as pdf_profesional
 
 BASE = Path(__file__).resolve().parent
 VACIO = "Sin información"
@@ -84,8 +84,8 @@ def recurso(*nombres):
     return next((BASE / n for n in nombres if (BASE / n).is_file()), None)
 
 
-def generar_pdf(registro, claves, actualizado):
-    return pdf_profesional(registro, claves, actualizado, COLORES, normalizar, BASE)
+def generar_pdf(registro, claves, actualizado, mapa=None):
+    return pdf_profesional(registro, claves, actualizado, COLORES, normalizar, BASE, mapa=mapa)
 
 
 def main():
@@ -183,15 +183,31 @@ def main():
         if termino != VACIO:
             st.link_button(f"Buscar {termino} en Drive", "https://drive.google.com/drive/u/0/search?" + urlencode({"q": termino}), use_container_width=True)
             st.caption("La búsqueda abarca todo tu Drive; el botón anterior abre la carpeta configurada.")
+        identidad = sha256((str(registro.name) + registro.to_json()).encode()).hexdigest()[:16]
+        st.markdown('#### Mapa para el PDF')
+        captura = st.file_uploader('Subir captura del mapa', type=['png', 'jpg', 'jpeg'], key=f'mapa_{identidad}')
+        st.caption('Opcional · PNG o JPG, máximo 10 MB. Conserva el marcador, los nombres y los créditos del mapa. Se incluye en el PDF de este registro; no se guarda en Drive.')
+        mapa = None
+        mapa_valido = True
+        if captura is not None:
+            try:
+                mapa = preparar_mapa(captura.getvalue())
+            except ValueError as exc:
+                mapa_valido = False
+                st.error(str(exc))
+            else:
+                st.image(mapa, caption='Esta captura se incluirá en el PDF', use_container_width=True)
         try:
-            contenido = generar_pdf(registro, claves, actualizado)
+            contenido = generar_pdf(registro, claves, actualizado, mapa=mapa) if mapa_valido else None
         except Exception:
             LOG.exception("Error al generar PDF")
             st.error("No se pudo generar el PDF. El resto de la ficha sigue disponible.")
         else:
             nombre = re.sub(r"[^\w-]+", "_", str(orden))[:80]
-            st.download_button("📄 Descargar ficha PDF", contenido, file_name=f"Ficha_OT_{nombre}.pdf", mime="application/pdf", use_container_width=True)
-        identidad = sha256((str(registro.name) + registro.to_json()).encode()).hexdigest()[:16]
+            if contenido is not None:
+                st.download_button("📄 Descargar ficha PDF", contenido, file_name=f"Ficha_OT_{nombre}.pdf", mime="application/pdf", use_container_width=True)
+            else:
+                st.info('Reemplaza o elimina la captura inválida para descargar la ficha.')
         foto = st.file_uploader("Vista previa de evidencia", type=["png", "jpg", "jpeg"], key=f"foto_{identidad}")
         st.caption("La imagen es temporal: no se guarda en Drive ni se incluye en el PDF.")
         if foto:
